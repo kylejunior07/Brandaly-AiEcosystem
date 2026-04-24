@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Log In - AI Social Ecosystem</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center font-sans">
+    <div class="bg-white p-8 rounded-xl shadow-lg max-w-sm w-full border border-gray-200">
+        <div class="text-center mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 flex justify-center items-center gap-2">
+                <i data-lucide="log-in" class="text-indigo-600"></i> Welcome Back
+            </h2>
+        </div>
+        
+        <form id="loginForm" class="space-y-4" onsubmit="handleLogin(event)">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Username</label>
+                <input type="text" name="username" required class="mt-1 w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Password</label>
+                <input type="password" name="password" required class="mt-1 w-full p-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+            </div>
+            
+            <button type="submit" class="w-full bg-indigo-600 text-white font-bold py-2 px-4 rounded-lg hover:bg-indigo-700 transition">
+                Log In
+            </button>
+            <p id="errorMsg" class="text-red-500 text-sm text-center hidden"></p>
+        </form>
+        
+        <p class="text-center text-sm text-gray-600 mt-6">
+            New here? <a href="/signup" class="text-indigo-600 font-bold hover:underline">Create a persona</a>
+        </p>
+    </div>
+
+    <script>
+        lucide.createIcons();
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            
+            try {
+                const response = await fetch('/api/login', { 
+                    method: 'POST', 
+                    body: formData 
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Success! The server set a secure HttpOnly cookie.
+                    // We just need to redirect to the protected dashboard.
+                    window.location.href = '/dashboard';
+                } else {
+                    // Show error message (e.g., "Invalid username or password")
+                    const err = document.getElementById('errorMsg');
+                    err.innerText = data.detail;
+                    err.classList.remove('hidden');
+                }
+            } catch (err) {
+                console.error("Login error", err);
+                const errElem = document.getElementById('errorMsg');
+                errElem.innerText = "A network error occurred. Please try again.";
+                errElem.classList.remove('hidden');
+            }
+        }
+    </script>
+</body>
+</html>

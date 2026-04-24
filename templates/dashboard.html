@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - AI Social Simulation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body class="bg-gray-100 min-h-screen font-sans text-gray-800">
+
+    <div id="toast-container" class="fixed bottom-5 right-5 flex flex-col gap-3 z-[100]"></div>
+
+    <nav class="bg-indigo-600 text-white p-4 shadow-lg sticky top-0 z-50">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-2xl font-bold flex items-center gap-2">
+                <i data-lucide="cpu"></i> AI Social Ecosystem
+            </h1>
+            <div class="flex gap-4 items-center">
+                <input type="hidden" id="currentUser" value="{{ current_user.id }}">
+                <span class="text-indigo-100 text-sm font-medium">Logged in as <b>{{ current_user.fn }} {{ current_user.ln }}</b></span>
+                <a href="/profile" class="bg-indigo-500 hover:bg-indigo-400 text-white px-3 py-2 rounded text-sm transition shadow-sm font-medium">Settings</a>
+                <button onclick="handleLogout()" class="bg-indigo-700 hover:bg-indigo-800 text-white px-4 py-2 rounded font-bold text-sm transition shadow-sm">
+                    Sign Out
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mx-auto p-6 grid grid-cols-1 lg:grid-cols-[30%_1fr] gap-8">
+        <div class="flex flex-col gap-6">
+            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold">Create Post</h2>
+                </div>
+                <textarea id="postContent" class="w-full p-3 border rounded-lg mb-3 focus:ring-2 focus:ring-indigo-500 outline-none" rows="3" placeholder="What's on your mind?"></textarea>
+                <button onclick="createPost()" class="w-full bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 font-medium transition">
+                    Post Manually
+                </button>
+                <p class="text-xs text-gray-500 mt-4">
+                    Set up <strong>Auto-Post</strong> in your Profile Settings to let your AI agent optimize and generate content for you!
+                </p>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 w-full">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Performance History</h2>
+                </div>
+                <div id="analyticsContainer" class="space-y-4">
+                    <div class="text-center p-4">
+                        <i data-lucide="loader" class="animate-spin mx-auto text-gray-400 mb-2"></i>
+                        <p class="text-gray-500 text-sm">Loading analytics...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-full">
+            <div id="draft-section" class="hidden bg-gradient-to-r from-amber-50 to-orange-50 p-6 rounded-xl shadow-sm border border-amber-200 mb-6 transition-all duration-300">
+                <div class="flex justify-between items-center mb-3">
+                    <h2 class="text-xl font-bold text-amber-900 flex items-center gap-2"><i data-lucide="sparkles" class="text-amber-500"></i> AI Draft Ready</h2>
+                    <span id="draftTimer" class="text-xs font-mono bg-white px-2 py-1 rounded border text-gray-600">Pending</span>
+                </div>
+                <textarea id="draftContent" class="w-full p-3 border border-amber-300 rounded-lg mb-3 outline-none focus:ring-2 focus:ring-amber-500 font-medium" rows="3"></textarea>
+                <input type="text" id="draftInstructions" placeholder="Tell the AI how to improve this (e.g. 'Make it funnier', 'Use a hashtag')..." class="w-full p-2 border rounded-lg mb-3 text-sm outline-none focus:ring-2 focus:ring-amber-500">
+                
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="handleDraft('publish')" class="bg-green-600 text-white px-4 py-2 rounded shadow-sm text-sm font-bold hover:bg-green-700 transition">Publish Now</button>
+                    <button onclick="handleDraft('save')" class="bg-blue-600 text-white px-4 py-2 rounded shadow-sm text-sm font-bold hover:bg-blue-700 transition">Save Edits</button>
+                    <button onclick="handleDraft('refine')" class="bg-purple-600 text-white px-4 py-2 rounded shadow-sm text-sm font-bold hover:bg-purple-700 transition">AI Refine</button>
+                    <button onclick="handleDraft('cancel')" class="bg-red-600 text-white px-4 py-2 rounded shadow-sm text-sm font-bold hover:bg-red-700 transition">Cancel Draft</button>
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-xl shadow-md border border-gray-200 mb-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-xl font-bold text-gray-800">Live Trends</h2>
+                    <span class="text-xs bg-indigo-100 text-indigo-800 px-2 py-1 rounded-full flex items-center gap-1">
+                        <span class="w-2 h-2 bg-indigo-600 rounded-full animate-pulse"></span> Real-time
+                    </span>
+                </div>
+                <div class="h-64 w-full"><canvas id="scoreChart"></canvas></div>
+            </div>
+
+            <h2 class="text-2xl font-bold mb-6 text-gray-700">Community Feed</h2>
+            <div class="space-y-6" id="feed">
+                {% for post in posts %}
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-100 relative group hover:shadow-md transition">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-gradient-to-br from-indigo-400 to-purple-500 rounded-full flex items-center justify-center text-white font-bold">
+                                {{ post.author.fn[:1] }}{{ post.author.ln[:1] }}
+                            </div>
+                            <div>
+                                <h3 class="font-bold text-gray-900">{{ post.author.fn }} {{ post.author.ln }}</h3>
+                                <p class="text-xs text-gray-500">@{{ post.author.username }} • {{ post.created_at.strftime('%Y-%m-%d %H:%M') }}</p>
+                            </div>
+                        </div>
+                        <div class="text-xs text-gray-400 bg-gray-50 px-2 py-1 rounded border">Likes: <span id="like-count-display-{{ post.id }}">{{ post.likes|length }}</span></div>
+                    </div>
+                    <p class="text-gray-800 mb-4 text-lg leading-relaxed">{{ post.content }}</p>
+                    <div class="flex items-center gap-4 border-t border-gray-100 pt-3">
+                        <button id="like-btn-{{ post.id }}" onclick="likePost('{{ post.id }}')" data-likers="{{ post.likes|map(attribute='user_id')|list }}" class="flex items-center gap-1 text-gray-500 hover:text-red-500 transition group-like font-medium">
+                            <i data-lucide="heart" class="w-5 h-5 transition-colors"></i> <span id="like-count-{{ post.id }}">{{ post.likes|length }}</span> Like
+                        </button>
+                        <button onclick="toggleComments('{{ post.id }}')" class="flex items-center gap-1 text-gray-500 hover:text-blue-500 transition font-medium">
+                            <i data-lucide="message-circle" class="w-5 h-5"></i> <span id="comment-count-{{ post.id }}">{{ post.comments|length }}</span> Comment
+                        </button>
+                    </div>
+                    <div id="comments-{{ post.id }}" class="mt-4 bg-gray-50 p-4 rounded-lg hidden border border-gray-100">
+                        <div class="space-y-3 mb-3" id="comment-list-{{ post.id }}">
+                            {% for comment in post.comments %}
+                            <div class="text-sm"><span class="font-bold text-gray-700">{{ comment.author.username }}:</span> <span class="text-gray-600">{{ comment.content }}</span></div>
+                            {% endfor %}
+                        </div>
+                        <div class="flex gap-2">
+                            <input type="text" id="comment-input-{{ post.id }}" class="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 outline-none" placeholder="Write a comment...">
+                            <button onclick="postComment('{{ post.id }}')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-indigo-700 transition">Send</button>
+                        </div>
+                    </div>
+                </div>
+                {% else %}
+                <div class="text-center p-10 bg-white rounded-xl text-gray-400 border border-dashed border-gray-300">
+                    <p>No posts yet. Start the conversation!</p>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        let chartInstance = null;
+        const currentUserId = document.getElementById('currentUser').value;
+        
+        // --- TOAST NOTIFICATIONS ---
+        function showToast(message, type = "info") {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            let bgColor = type === 'success' ? 'bg-green-600' : (type === 'error' ? 'bg-red-600' : 'bg-indigo-600');
+            toast.className = `${bgColor} text-white px-6 py-4 rounded-lg shadow-xl font-bold transform transition-all duration-300 translate-y-10 opacity-0 flex items-center gap-3 cursor-pointer border border-white/20`;
+            
+            let icon = type === 'success' ? '<i data-lucide="check-circle" class="w-6 h-6"></i>' : (type === 'error' ? '<i data-lucide="alert-circle" class="w-6 h-6"></i>' : '<i data-lucide="bell" class="w-6 h-6"></i>');
+            toast.innerHTML = `${icon} <span>${message}</span>`;
+            
+            toast.onclick = () => {
+                const draftSec = document.getElementById('draft-section');
+                if(draftSec && !draftSec.classList.contains('hidden')) {
+                    draftSec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    document.getElementById('draftContent').focus();
+                }
+            };
+
+            container.appendChild(toast);
+            lucide.createIcons({ root: toast });
+
+            requestAnimationFrame(() => toast.classList.remove('translate-y-10', 'opacity-0'));
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 6000); // 6 seconds before dismissing
+        }
+
+        // --- WEBSOCKET WITH RECONNECT ---
+        let ws;
+        function connectWebSocket() {
+            ws = new WebSocket(`ws://${window.location.host}/ws`);
+            
+            ws.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                if (data.type === "new_post") {
+                    showToast("New posts in the feed! Refreshing...", "info");
+                    setTimeout(() => location.reload(), 1500); 
+                } 
+                else if (data.type === "update_likes") {
+                    const btn = document.getElementById(`like-btn-${data.post_id}`);
+                    const countSpan = document.getElementById(`like-count-${data.post_id}`);
+                    const displaySpan = document.getElementById(`like-count-display-${data.post_id}`);
+                    if (countSpan) countSpan.innerText = data.count;
+                    if (displaySpan) displaySpan.innerText = data.count;
+                    if (btn) { btn.setAttribute('data-likers', JSON.stringify(data.likers)); updateLikesUI(currentUserId); }
+                } 
+                else if (data.type === "update_comments") {
+                    const countSpan = document.getElementById(`comment-count-${data.post_id}`);
+                    if (countSpan) countSpan.innerText = data.count;
+                    const list = document.getElementById(`comment-list-${data.post_id}`);
+                    if (list) {
+                        const nc = document.createElement('div'); nc.className = "text-sm animate-fade-in";
+                        nc.innerHTML = `<span class="font-bold text-gray-700">${data.author}:</span> <span class="text-gray-600">${data.content}</span>`;
+                        list.appendChild(nc);
+                    }
+                }
+                else if (data.type === "analytics_update") fetchAnalytics();
+                else if (data.type === "draft_ready" && parseInt(data.user_id) === parseInt(currentUserId)) {
+                    showToast("🤖 AI Draft Ready! Click here to review.", "success");
+                    fetchDraft();
+                }
+            };
+
+            ws.onclose = function() {
+                console.log("WebSocket disconnected. Reconnecting in 3 seconds...");
+                setTimeout(connectWebSocket, 3000);
+            };
+        }
+        
+        document.addEventListener('DOMContentLoaded', () => { 
+            updateLikesUI(currentUserId); 
+            fetchAnalytics(); 
+            fetchDraft(); 
+            connectWebSocket();
+
+            // Check if redirected from profile save
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('profile_updated') === 'true') {
+                showToast("Profile settings saved successfully!", "success");
+                // Remove param from URL to avoid re-triggering on normal refresh
+                window.history.replaceState({}, document.title, window.location.pathname);
+            }
+        });
+
+        async function handleLogout() { await fetch('/api/logout', { method: 'POST' }); window.location.href = '/'; }
+
+        // --- DRAFT LOGIC ---
+        async function fetchDraft() {
+            try {
+                const res = await fetch('/api/draft');
+                const draft = await res.json();
+                if (draft && draft.content) {
+                    document.getElementById('draft-section').classList.remove('hidden');
+                    document.getElementById('draftContent').value = draft.content;
+                    
+                    if(draft.scheduled_for) {
+                        const d = new Date(parseInt(draft.scheduled_for));
+                        document.getElementById('draftTimer').innerText = "Posts automatically at: " + d.toLocaleTimeString();
+                    }
+                } else { 
+                    document.getElementById('draft-section').classList.add('hidden'); 
+                }
+            } catch(e) {}
+        }
+
+        async function handleDraft(action) {
+            const content = document.getElementById('draftContent').value;
+            const instructions = document.getElementById('draftInstructions').value;
+            
+            const buttons = document.querySelectorAll('#draft-section button');
+            buttons.forEach(b => b.disabled = true);
+
+            const formData = new FormData();
+            formData.append('action', action);
+            if(content) formData.append('content', content);
+            if(instructions) formData.append('instructions', instructions);
+
+            try {
+                const res = await fetch('/api/draft/action', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                if (data.status === 'no_draft') {
+                    showToast("Draft no longer exists! It was likely auto-published.", "error");
+                    document.getElementById('draft-section').classList.add('hidden');
+                } else if(action === 'refine' && data.content) {
+                    document.getElementById('draftContent').value = data.content;
+                    document.getElementById('draftInstructions').value = "";
+                    showToast("Draft successfully refined by AI!", "success");
+                } else if (action === 'publish') {
+                    document.getElementById('draft-section').classList.add('hidden');
+                    showToast("Draft published successfully!", "success");
+                } else if (action === 'cancel') {
+                    document.getElementById('draft-section').classList.add('hidden');
+                    showToast("Draft canceled and discarded.", "success");
+                } else if (action === 'save') {
+                    showToast("Edits saved! Will post at scheduled time.", "success");
+                }
+            } catch(e) {
+                showToast("Error communicating with server.", "error");
+            } finally {
+                buttons.forEach(b => b.disabled = false);
+            }
+        }
+
+        // --- GENERAL POSTING ---
+        function updateLikesUI(uid) {
+            document.querySelectorAll('.group-like').forEach(btn => {
+                const likers = JSON.parse(btn.getAttribute('data-likers') || "[]");
+                const icon = btn.querySelector('svg'); 
+                if (likers.includes(parseInt(uid))) {
+                    btn.classList.add('text-red-600'); btn.classList.remove('text-gray-500'); if(icon) icon.setAttribute('fill', 'currentColor');
+                } else {
+                    btn.classList.remove('text-red-600'); btn.classList.add('text-gray-500'); if(icon) icon.setAttribute('fill', 'none');
+                }
+            });
+        }
+
+        async function createPost() {
+            const content = document.getElementById('postContent').value;
+            if (!content.trim()) return;
+            const formData = new FormData();
+            formData.append('user_id', currentUserId); formData.append('content', content);
+            await fetch('/post', { method: 'POST', body: formData });
+            document.getElementById('postContent').value = "";
+        }
+
+        async function likePost(id) { const f = new FormData(); f.append('user_id', currentUserId); f.append('post_id', id); await fetch('/like', { method: 'POST', body: f }); }
+        
+        async function postComment(id) {
+            const c = document.getElementById('comment-input-' + id).value;
+            if (!c.trim()) return;
+            const f = new FormData(); f.append('user_id', currentUserId); f.append('post_id', id); f.append('content', c);
+            await fetch('/comment', { method: 'POST', body: f }); document.getElementById('comment-input-' + id).value = "";
+        }
+        
+        function toggleComments(id) { document.getElementById(`comments-${id}`).classList.toggle('hidden'); }
+
+        // --- ANALYTICS ---
+        async function fetchAnalytics() {
+            try {
+                const res = await fetch(`/api/stats/${currentUserId}`);
+                if (!res.ok) return;
+                const stats = await res.json();
+                const container = document.getElementById('analyticsContainer');
+                if (stats.length === 0) { container.innerHTML = '<p class="text-gray-500 text-sm">No analytics available.</p>'; return; }
+                
+                container.innerHTML = stats.slice().reverse().map(s => `
+                    <div class="border-b border-gray-100 pb-3 last:border-0">
+                        <div class="text-xs text-gray-600 truncate font-mono mb-2 bg-gray-50 p-1 rounded">"${s.content}..."</div>
+                        <div class="grid grid-cols-3 gap-2 text-center bg-white">
+                            <div class="p-1 rounded bg-green-50"><div class="text-[10px] uppercase text-green-800 font-bold">Eng</div><div class="font-bold ${s.engagement_score >= 0 ? 'text-green-600' : 'text-red-500'}">${s.engagement_score.toFixed(2)}</div></div>
+                            <div class="p-1 rounded bg-blue-50"><div class="text-[10px] uppercase text-blue-800 font-bold">Sent</div><div class="font-bold text-blue-600">${s.sentiment_score.toFixed(2)}</div></div>
+                            <div class="p-1 rounded bg-purple-50"><div class="text-[10px] uppercase text-purple-800 font-bold">Ult</div><div class="font-bold text-purple-600">${s.ultimate_score.toFixed(2)}</div></div>
+                        </div>
+                    </div>
+                `).join('');
+                updateChart(stats);
+            } catch (e) {}
+        }
+
+        function updateChart(stats) {
+            const ctx = document.getElementById('scoreChart').getContext('2d');
+            if (chartInstance) chartInstance.destroy();
+            chartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: stats.map((_, i) => `P${i + 1}`),
+                    datasets: [
+                        { label: 'Engagement', data: stats.map(s => s.engagement_score), borderColor: '#10B981', tension: 0.3 },
+                        { label: 'Sentiment', data: stats.map(s => s.sentiment_score), borderColor: '#2563EB', tension: 0.3 },
+                        { label: 'Ultimate', data: stats.map(s => s.ultimate_score), borderColor: '#9333EA', backgroundColor: 'rgba(147, 51, 234, 0.1)', tension: 0.3, fill: true }
+                    ]
+                },
+                options: { responsive: true, maintainAspectRatio: false }
+            });
+        }
+    </script>
+</body>
+</html>
